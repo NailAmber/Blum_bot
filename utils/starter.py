@@ -10,7 +10,7 @@ import asyncio
 from aiohttp.client_exceptions import ContentTypeError
 
 
-async def start(thread: int, session_name: str, phone_number: str, proxy: [str, None]):
+async def start(thread: int, session_name: str, phone_number: str, proxy: [str, None], ref_mode):
     blum = BlumBot(session_name=session_name, phone_number=phone_number, thread=thread, proxy=proxy)
     account = session_name + '.session'
 
@@ -31,6 +31,9 @@ async def start(thread: int, session_name: str, phone_number: str, proxy: [str, 
         await blum.logout()
         return
 
+    if ref_mode:
+        await blum.process_ref_link()
+
     while True:
         try:
             await asyncio.sleep(5)
@@ -47,6 +50,9 @@ async def start(thread: int, session_name: str, phone_number: str, proxy: [str, 
             if config.PLAY_GAME:
                 await blum.play_game()
                 await sleep(uniform(5, 8))
+
+            await blum.weekly_tasks()
+            await sleep(uniform(5, 8))
 
             await blum.tasks()
             await sleep(uniform(5, 8))

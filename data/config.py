@@ -6,7 +6,7 @@ REF_LINK = 'https://t.me/blum/app?startapp=ref_BnfCloGV5x'
 
 DELAYS = {
     "RELOGIN": [5, 7],  # delay after a login attempt
-    'ACCOUNT': [5, 15],  # delay between connections to accounts (the more accounts, the longer the delay)
+    'ACCOUNT': [5, 40],  # delay between connections to accounts (the more accounts, the longer the delay)
     'PLAY': [5, 15],   # delay between play in seconds
     'ERROR_PLAY': [5, 8],    # delay between errors in the game in seconds
     'CLAIM': [600, 1800],   # delay in seconds before claim points every 8 hours

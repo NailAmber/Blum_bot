@@ -9,7 +9,7 @@ import os
 
 async def main():
     print("Forked by Nailambe (Soft's author: https://t.me/ApeCryptor)\n")
-    action = int(input("Select action:\n1. Start soft\n2. Get statistics\n3. Create sessions\n\n> "))
+    action = int(input("Select action:\n1. Start soft\n2. Get statistics\n3. Create sessions\n4. Start soft & create ref links\n> "))
 
     if not os.path.exists('sessions'): os.mkdir('sessions')
 
@@ -29,14 +29,17 @@ async def main():
         if not os.path.exists('statistics'): os.mkdir('statistics')
         await stats()
 
-    if action == 1:
+    if action == 1 or action == 4:
+        ref_mode = False
+        if action == 4:
+            ref_mode = True
         accounts = await Accounts().get_accounts()
 
         tasks = []
 
         for thread, account in enumerate(accounts):
             session_name, phone_number, proxy = account.values()
-            tasks.append(asyncio.create_task(start(session_name=session_name, phone_number=phone_number, thread=thread, proxy=proxy)))
+            tasks.append(asyncio.create_task(start(session_name=session_name, phone_number=phone_number, thread=thread, proxy=proxy, ref_mode=ref_mode)))
 
         await asyncio.gather(*tasks)
 

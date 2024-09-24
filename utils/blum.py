@@ -13,6 +13,8 @@ import aiohttp
 from fake_useragent import UserAgent
 from aiohttp_socks import ProxyConnector
 from faker import Faker
+import os
+import json
 
 
 def retry_async(max_retries=2):
@@ -37,7 +39,14 @@ class BlumBot:
     def __init__(self, thread: int, session_name: str, phone_number: str, proxy: [str, None]):
         self.account = session_name + '.session'
         self.thread = thread
-        self.ref_token = config.REF_LINK.split('_')[1]
+        if os.path.exists("ref_links"):
+            # Если файл существует, открываем его и загружаем словарь
+            with open("ref_links", 'r') as file:
+                data = json.load(file)
+                self.ref_token = random.choice(list(data.values()))
+        else:
+            self.ref_token = config.REF_LINK.split('_')[1]
+        print('token is = ', self.ref_token)
         self.proxy = f"{config.PROXY['TYPE']['REQUESTS']}://{proxy}" if proxy is not None else None
         connector = ProxyConnector.from_url(self.proxy) if proxy else aiohttp.TCPConnector(verify_ssl=False)
 
@@ -68,6 +77,28 @@ class BlumBot:
             return False
         else:
             return True
+        
+    async def process_ref_link(self):
+        r = await (await self.session.get("https://user-domain.blum.codes/api/v1/friends/balance")).json()
+        ref_token = r.get("referralToken")
+        if os.path.exists("ref_links"):
+            # Если файл существует, открываем его и загружаем словарь
+            with open("ref_links", 'r') as file:
+                data = json.load(file)
+            
+            # Модифицируем значение или добавляем новый ключ
+            data[self.account] = ref_token
+            print(f'Файл найден. Значение для ключа "{self.account}" обновлено.')
+        else:
+            # Если файл не существует, создаем новый словарь
+            data = {self.account: ref_token}
+            print(f'Файл не найден. Создан новый словарь с ключом "{self.account}".')
+
+        # Сохраняем изменения обратно в файл
+        with open("ref_links", 'w') as file:
+            json.dump(data, file, indent=4)
+
+        
 
     @retry_async()
     async def friend_claim(self):
@@ -126,6 +157,26 @@ class BlumBot:
         else:
             logger.error(f"Thread {self.thread} | {self.account} | Failed complete task «{task['title']}»")
 
+
+
+    @retry_async()
+    async def weekly_tasks(self):
+        sub_sections = await self.get_weekly_tasks()
+
+        for sub_section in sub_sections:
+            if sub_section.get('kind') in ['GROUP']:
+                random.shuffle(sub_section.get('subTasks')) if sub_section.get('subTasks') and config.SHUFFLE_TASKS else None
+                for subTask in sub_section.get('subTasks'):
+                    if subTask['title'] in config.BLACKLIST_TASK: continue
+
+                    if subTask['status'] == 'READY_FOR_CLAIM':
+                        await self.claim_task(subTask, sub_section)
+
+                    if subTask['status'] == 'NOT_STARTED':
+                        if await self.start_complete_task(subTask, sub_section):
+                            await self.claim_task(subTask, sub_section)
+    
+
     @retry_async()
     async def tasks(self):
         sub_sections = await self.get_tasks()
@@ -178,6 +229,12 @@ class BlumBot:
         resp_json = await resp.json()
 
         return resp_json[-1].get('subSections')
+    
+    async def get_weekly_tasks(self):
+        resp = await self.session.get('https://earn-domain.blum.codes/api/v1/tasks')
+        resp_json = await resp.json()
+
+        return resp_json[-2].get('tasks')
 
     async def play_game(self):
         timestamp, start_time, end_time, play_passes = await self.balance()
@@ -233,10 +290,23 @@ class BlumBot:
         return int(resp_json.get("timestamp")/1000), resp_json.get("availableBalance")
 
     async def start(self):
-        resp = await self.session.post("https://game-domain.blum.codes/api/v1/farming/start")
+        status = False
+        while status == False:
+            resp = await self.session.post("https://game-domain.blum.codes/api/v1/user/start")
+            if resp.status != 200:
+                logger.error(f"Thread {self.thread} | {self.account} | Get balance error {resp.status}")
+            else:
+                status = True
+
 
     async def balance(self):
-        resp = await self.session.get("https://game-domain.blum.codes/api/v1/user/balance")
+        status = False
+        while status == False:
+            resp = await self.session.get("https://game-domain.blum.codes/api/v1/user/balance")
+            if resp.status != 200:
+                logger.error(f"Thread {self.thread} | {self.account} | Get balance error {resp.status}")
+            else:
+                status = True
         resp_json = await resp.json()
         await asyncio.sleep(1)
 
